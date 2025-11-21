@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>simple-plus</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <modules>
+        <module>common-bom</module>
+        <module>common-alibaba-bom</module>
+        <module>common-log</module>
+        <module>common-service-impl</module>
+        <module>common-excel</module>
+        <module>common-core</module>
+        <module>common-redis</module>
+        <module>common-doc</module>
+        <module>common-security</module>
+        <module>common-satoken</module>
+        <module>common-web</module>
+        <module>common-mybatis</module>
+        <module>common-job</module>
+        <module>common-dubbo</module>
+        <module>common-seata</module>
+        <module>common-loadbalancer</module>
+        <module>common-oss</module>
+        <module>common-ratelimiter</module>
+        <module>common-idempotent</module>
+        <module>common-mail</module>
+        <module>common-sms</module>
+        <module>common-logstash</module>
+        <module>common-elasticsearch</module>
+        <module>common-skylog</module>
+        <module>common-prometheus</module>
+        <module>common-translation</module>
+        <module>common-sensitive</module>
+        <module>common-json</module>
+        <module>common-encrypt</module>
+        <module>common-tenant</module>
+        <module>common-websocket</module>
+        <module>common-social</module>
+        <module>common-nacos</module>
+        <module>common-bus</module>
+        <module>common-sse</module>
+    </modules>
+
+    <artifactId>common</artifactId>
+    <packaging>pom</packaging>
+
+    <description>
+        common通用模块
+    </description>
+
+</project>

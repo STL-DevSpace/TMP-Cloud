@@ -1,0 +1,85 @@
+# 安全配置
+security:
+  # 不校验白名单
+  ignore:
+    whites:
+      - /auth/code
+      - /auth/logout
+      - /auth/login
+      - /auth/binding/*
+      - /auth/register
+      - /auth/tenant/list
+      - /resource/sms/code
+      - /resource/sse/close
+      - /*/v3/api-docs
+      - /*/error
+      - /csrf
+      - /warm-flow-ui/**
+
+spring:
+  cloud:
+    # 网关配置
+    gateway:
+      # 打印请求日志(自定义)
+      requestLog: true
+      server:
+        webflux:
+          discovery:
+            locator:
+              lowerCaseServiceId: true
+              enabled: true
+          routes:
+            # 认证中心
+            - id: auth
+              uri: lb://auth
+              predicates:
+                - Path=/auth/**
+              filters:
+                - StripPrefix=1
+            # 代码生成
+            - id: simple-gen
+              uri: lb://simple-gen
+              predicates:
+                - Path=/tool/**
+              filters:
+                - StripPrefix=1
+            # 系统模块
+            - id: simple-system
+              uri: lb://simple-system
+              predicates:
+                - Path=/system/**,/monitor/**
+              filters:
+                - StripPrefix=1
+            # 资源服务
+            - id: simple-resource
+              uri: lb://simple-resource
+              predicates:
+                - Path=/resource/**
+              filters:
+                - StripPrefix=1
+            # workflow服务
+            - id: simple-workflow
+              uri: lb://simple-workflow
+              predicates:
+                - Path=/workflow/**
+              filters:
+                - StripPrefix=1
+            # warm-flow服务
+            - id: warm-flow
+              uri: lb://simple-workflow
+              predicates:
+                - Path=/warm-flow-ui/**,/warm-flow/**
+            # 演示服务
+            - id: demo
+              uri: lb://demo
+              predicates:
+                - Path=/demo/**
+              filters:
+                - StripPrefix=1
+            # MQ演示服务
+            - id: test-mq
+              uri: lb://test-mq
+              predicates:
+                - Path=/test-mq/**
+              filters:
+                - StripPrefix=1
