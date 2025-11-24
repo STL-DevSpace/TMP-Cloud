@@ -13,7 +13,7 @@
     <modules>
 <!--        <module></module>-->
     </modules>
-    <artifactId>modules</artifactId>
+    <artifactId>lingtai</artifactId>
     <packaging>pom</packaging>
 
     <description>
@@ -21,6 +21,30 @@
     </description>
 
     <dependencies>
+
+        <!-- 自定义负载均衡(多团队开发使用) -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>common-loadbalancer</artifactId>
+        </dependency>
+
+        <!-- ELK 日志收集 -->
+        <!--        <dependency>-->
+        <!--            <groupId>org.dromara</groupId>-->
+        <!--            <artifactId>common-logstash</artifactId>-->
+        <!--        </dependency>-->
+
+        <!-- skywalking 日志收集 -->
+        <!--        <dependency>-->
+        <!--            <groupId>org.dromara</groupId>-->
+        <!--            <artifactId>common-skylog</artifactId>-->
+        <!--        </dependency>-->
+
+        <!-- prometheus 监控 -->
+        <!--        <dependency>-->
+        <!--            <groupId>org.dromara</groupId>-->
+        <!--            <artifactId>common-prometheus</artifactId>-->
+        <!--        </dependency>-->
 
     </dependencies>
 </project>
