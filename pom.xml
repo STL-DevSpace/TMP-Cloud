@@ -378,6 +378,7 @@
         <module>api</module>
         <module>common</module>
         <module>example</module>
+        <module>lingtai</module>
     </modules>
     <packaging>pom</packaging>
 
