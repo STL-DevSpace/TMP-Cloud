@@ -83,3 +83,10 @@ spring:
                 - Path=/test-mq/**
               filters:
                 - StripPrefix=1
+            # TMP-sidecar模块
+            - id: lingtai-sidecar
+              uri: lb://lingtai-sidecar
+              predicates:
+                - Path=/sidecar/**
+              filters:
+                - StripPrefix=1
