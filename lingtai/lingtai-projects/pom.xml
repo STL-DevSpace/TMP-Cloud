@@ -105,12 +105,6 @@
             <artifactId>api-workflow</artifactId>
         </dependency>
 
-        <!--  Sidecar -->
-        <dependency>
-            <groupId>com.alibaba.cloud</groupId>
-            <artifactId>spring-cloud-starter-alibaba-sidecar</artifactId>
-        </dependency>
-
     </dependencies>
 
     <build>

@@ -31,4 +31,4 @@ spring:
     import:
       - optional:nacos:application-common.yml
       - optional:nacos:datasource.yml
-#      - optional:nacos:${spring.application.name}.yml
+      - optional:nacos:${spring.application.name}.yml
