@@ -9,10 +9,10 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>lingtai-project</artifactId>
+    <artifactId>lingtai-projects</artifactId>
 
     <description>
-        lingtai-project项目任务模块
+        lingtai-projects项目任务模块
     </description>
 
     <dependencies>
