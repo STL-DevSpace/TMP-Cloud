@@ -13,6 +13,7 @@
     <modules>
         <module>lingtai-sidecar</module>
         <module>lingtai-projects</module>
+        <module>lingtai-test</module>
     </modules>
     <artifactId>lingtai</artifactId>
     <packaging>pom</packaging>

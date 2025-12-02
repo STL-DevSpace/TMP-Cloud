@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package ai.training;
+
+option java_multiple_files = true;
+option java_package = "com.edgeai.training.api";
+
+// 模拟训练服务
+service TrainingService {
+    // 开始训练
+    rpc PiTrain (PiTrainRequest) returns (PiTrainReply) {}
+    // 暂停训练
+    rpc PauseTrain (PauseRequest) returns (PauseReply);
+    // 结束训练
+    rpc StopTrain  (StopRequest)  returns (StopReply);
+    // 获取训练进度
+    rpc GetProgress (ProgressRequest) returns (ProgressReply);
+}
+
+message PiTrainRequest {
+    string project_id = 1;
+    int32  epochs     = 2;
+    int32  batch_size = 3;
+    float  lr         = 4;
+}
+
+message PiTrainReply {
+    string project_id = 1;
+    float  final_loss = 2;
+    string status     = 3;
+    int32  rounds     = 4;
+    string log_path   = 5;
+}
+
+message PauseRequest  { string project_id = 1; }
+message PauseReply    { bool success = 1; }
+
+message StopRequest   { string project_id = 1; }
+message StopReply     { bool success = 1; }
+
+message ProgressRequest { string project_id = 1; }
+message ProgressReply   {
+    string project_id = 1;
+    float  progress   = 2;
+    int32  round      = 3;
+    float  loss       = 4;
+}

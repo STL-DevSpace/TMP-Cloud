@@ -41,6 +41,13 @@
                 <version>${revision}</version>
             </dependency>
 
+            <!-- workflow接口 -->
+            <dependency>
+                <groupId>org.dromara</groupId>
+                <artifactId>api-sidecar</artifactId>
+                <version>${revision}</version>
+            </dependency>
+
         </dependencies>
     </dependencyManagement>
 </project>

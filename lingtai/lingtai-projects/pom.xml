@@ -105,6 +105,11 @@
             <artifactId>api-workflow</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>api-sidecar</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

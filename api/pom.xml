@@ -13,6 +13,7 @@
         <module>api-system</module>
         <module>api-resource</module>
         <module>api-workflow</module>
+        <module>api-sidecar</module>
     </modules>
 
     <artifactId>api</artifactId>
