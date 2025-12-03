@@ -12,12 +12,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RequestMapping("/api/edgeai/clusters/")
+@RequestMapping("/api/edgeai/clusters")
 @RestController
 public class ClusterController {
     @Resource
     private ClustersService clustersService;
-    @RequestMapping("hello")
+
+    @Resource
+    private NodesService nodesService;
+    @RequestMapping("/hello")
     public String hello() {
         return "hello world";
     }
@@ -26,7 +29,7 @@ public class ClusterController {
      * 分页查询集群信息
      * @return
      */
-    @GetMapping("/")
+    @GetMapping
     public R<IPage<Cluster>> list(
         @RequestParam(defaultValue = "1") Integer pageNum,
         @RequestParam(defaultValue = "6") Integer pageSize
@@ -34,7 +37,7 @@ public class ClusterController {
         IPage<Cluster> list = clustersService.list(pageNum, pageSize);
         return R.ok(list);
     }
-    @PostMapping("/")
+    @PostMapping
     public R<Cluster> add(@RequestBody Cluster cluster) {
         // 从当前Token获取 userId
         String loginStr = StpUtil.getLoginId().toString();
@@ -45,14 +48,19 @@ public class ClusterController {
         return R.ok(result);
     }
     @GetMapping("/{id}")
-    public R<Cluster> getDetail(@PathVariable("id") int clusterId) {
+    public R<Cluster> getDetail(@PathVariable("id") Long clusterId) {
         Cluster result = clustersService.getDetail(clusterId);
         return R.ok(result);
     }
     @DeleteMapping("/{id}")
-    public R<String> delete(@PathVariable("id") int clusterId) {
+    public R<String> delete(@PathVariable("id") Long clusterId) {
         clustersService.delete(clusterId);
         return R.ok("删除成功");
+    }
+    @PostMapping("/{id}/nodes/")
+    public R<Nodes> addNode(@PathVariable("id") Long clusterId, @RequestBody Nodes node) {
+        Nodes result = nodesService.addByClusterId(clusterId, node);
+        return R.ok(result);
     }
 
 }

@@ -7,11 +7,11 @@ import lombok.Data;
 @Data
 @TableName("rays")
 public class Cluster {
-    private int id;
+    private Long id;
     @NotBlank
     private String name;
     private Long userId;
-    private int projectId;
+    private Long projectId;
     private String createdTime;
     private String lastUpdatedTime;
 }

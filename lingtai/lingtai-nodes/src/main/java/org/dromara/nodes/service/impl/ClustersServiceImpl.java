@@ -44,7 +44,7 @@ public class ClustersServiceImpl implements ClustersService {
     }
 
     @Override
-    public Cluster getDetail(int clusterId) {
+    public Cluster getDetail(Long clusterId) {
         LambdaQueryWrapper<Cluster> queryWrapper = new LambdaQueryWrapper<>();
         if(clusterId > 0){
             queryWrapper.eq(Cluster::getId, clusterId);
@@ -53,7 +53,7 @@ public class ClustersServiceImpl implements ClustersService {
     }
 
     @Override
-    public void delete(int clusterId) {
+    public void delete(Long clusterId) {
         boolean result = baseMapper.deleteById(clusterId) > 0;
         if(!result){
             // 删除失败

@@ -9,7 +9,7 @@ public interface ClustersService {
 
     Cluster add(Cluster cluster);
 
-    Cluster getDetail(int clusterId);
+    Cluster getDetail(Long clusterId);
 
-    void delete(int clusterId);
+    void delete(Long clusterId);
 }

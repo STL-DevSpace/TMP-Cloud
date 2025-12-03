@@ -7,4 +7,7 @@ import java.util.List;
 
 public interface NodesService {
     IPage<Nodes> list(Integer pageNum, Integer pageSize);
+
+
+    Nodes addByClusterId(Long clusterId, Nodes  node);
 }

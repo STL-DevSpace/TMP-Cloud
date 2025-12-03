@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/edgeai/nodes/")
+@RequestMapping("/api/edgeai/nodes")
 public class NodesContronller {
 
     @Resource
@@ -29,7 +29,7 @@ public class NodesContronller {
      * 分页查询节点信息
      * @return
      */
-    @GetMapping("/")
+    @GetMapping
     public R<IPage<Nodes>> list(
         @RequestParam(defaultValue = "1") Integer pageNum,
         @RequestParam(defaultValue = "10") Integer pageSize
