@@ -135,6 +135,11 @@ public class SysLoginService {
         String tenantId = registerBody.getTenantId();
         String username = registerBody.getUsername();
         String password = registerBody.getPassword();
+        String rePassword = registerBody.getRePassword();
+        String email = registerBody.getEmail();
+        if(!password.equals(rePassword)){
+            throw new UserException("两次密码不一致");
+        }
         // 校验用户类型是否存在
         String userType = UserType.getUserType(registerBody.getUserType()).getUserType();
 
@@ -151,6 +156,7 @@ public class SysLoginService {
         remoteUserBo.setNickName(username);
         remoteUserBo.setPassword(BCrypt.hashpw(password));
         remoteUserBo.setUserType(userType);
+        remoteUserBo.setEmail(email);
 
         boolean regFlag = remoteUserService.registerUserInfo(remoteUserBo);
         if (!regFlag) {

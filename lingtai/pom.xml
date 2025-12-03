@@ -13,7 +13,9 @@
     <modules>
         <module>lingtai-sidecar</module>
         <module>lingtai-projects</module>
-        <module>lingtai-test</module>
+        <module>lingtai-data</module>
+        <module>lingtai-nodes</module>
+
     </modules>
     <artifactId>lingtai</artifactId>
     <packaging>pom</packaging>

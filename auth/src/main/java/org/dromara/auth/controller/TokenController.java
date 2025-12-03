@@ -12,10 +12,12 @@ import me.zhyd.oauth.model.AuthUser;
 import me.zhyd.oauth.request.AuthRequest;
 import me.zhyd.oauth.utils.AuthStateUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
+import org.dromara.auth.domain.vo.BodyVO;
 import org.dromara.auth.domain.vo.LoginTenantVo;
 import org.dromara.auth.domain.vo.LoginVo;
 import org.dromara.auth.domain.vo.TenantListVo;
 import org.dromara.auth.form.RegisterBody;
+import org.dromara.auth.form.RegisterBodyWithToken;
 import org.dromara.auth.form.SocialLoginBody;
 import org.dromara.auth.service.IAuthStrategy;
 import org.dromara.auth.service.SysLoginService;
@@ -39,6 +41,7 @@ import org.dromara.system.api.RemoteSocialService;
 import org.dromara.system.api.RemoteTenantService;
 import org.dromara.system.api.domain.vo.RemoteClientVo;
 import org.dromara.system.api.domain.vo.RemoteTenantVo;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URL;
@@ -178,13 +181,65 @@ public class TokenController {
      */
 //    @ApiEncrypt
     @PostMapping("register")
-    public R<Void> register(@RequestBody RegisterBody registerBody) {
+    public R<RegisterBodyWithToken> register(@Validated @RequestBody RegisterBody registerBody) {
         if (!remoteConfigService.selectRegisterEnabled(registerBody.getTenantId())) {
             return R.fail("当前系统没有开启注册功能！");
         }
         // 用户注册
         sysLoginService.register(registerBody);
-        return R.ok();
+
+        // 注册成功后自动登录 - 执行登录逻辑
+        String clientId = registerBody.getClientId();
+        String grantType = registerBody.getGrantType();
+        RemoteClientVo clientVo = remoteClientService.queryByClientId(clientId);
+
+        // 查询不到 client 或 client 内不包含 grantType
+        if (ObjectUtil.isNull(clientVo) || !StringUtils.contains(clientVo.getGrantType(), grantType)) {
+            log.info("客户端id: {} 认证类型：{} 异常!.", clientId, grantType);
+            return R.fail(MessageUtils.message("auth.grant.type.error"));
+        } else if (!SystemConstants.NORMAL.equals(clientVo.getStatus())) {
+            return R.fail(MessageUtils.message("auth.grant.type.blocked"));
+        }
+
+        // 校验租户
+        sysLoginService.checkTenant(registerBody.getTenantId());
+
+        // 构造登录body
+        BodyVO loginBody = new BodyVO(
+            registerBody.getTenantId(),
+            registerBody.getUsername(),
+            registerBody.getPassword(),
+            false,
+            clientId,
+            grantType
+        );
+        String body = JsonUtils.toJsonString(loginBody);
+
+        // 执行登录
+        LoginVo loginVo = IAuthStrategy.login(body, clientVo, grantType);
+
+        Long userId = LoginHelper.getUserId();
+        scheduledExecutorService.schedule(() -> {
+            remoteMessageService.publishMessage(List.of(userId), "欢迎注册");
+        }, 5, TimeUnit.SECONDS);
+
+        // 构造返回结果，包含注册信息和token
+        RegisterBodyWithToken result = new RegisterBodyWithToken();
+        // 复制注册信息
+        result.setTenantId(registerBody.getTenantId());
+        result.setClientId(registerBody.getClientId());
+        result.setGrantType(registerBody.getGrantType());
+        result.setUsername(registerBody.getUsername());
+        result.setPassword(registerBody.getPassword());
+        result.setRePassword(registerBody.getRePassword());
+        result.setUserType(registerBody.getUserType());
+        result.setNickname(registerBody.getNickname());
+        result.setEmail(registerBody.getEmail());
+        // 添加token信息
+        result.setAccessToken(loginVo.getAccessToken());
+        result.setExpiresIn(loginVo.getExpireIn());
+
+        return R.ok(result);
     }
 
     /**
