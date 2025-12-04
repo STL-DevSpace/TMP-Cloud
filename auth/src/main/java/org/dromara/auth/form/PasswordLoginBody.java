@@ -30,4 +30,5 @@ public class PasswordLoginBody extends LoginBody {
 //    @Pattern(regexp = RegexConstants.PASSWORD, message = "{user.password.format.valid}")
     private String password;
 
+
 }

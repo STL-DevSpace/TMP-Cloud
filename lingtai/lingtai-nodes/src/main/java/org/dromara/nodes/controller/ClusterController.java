@@ -30,12 +30,12 @@ public class ClusterController {
      * @return
      */
     @GetMapping
-    public R<IPage<Cluster>> list(
+    public R<List<Cluster>> list(
         @RequestParam(defaultValue = "1") Integer pageNum,
-        @RequestParam(defaultValue = "6") Integer pageSize
+        @RequestParam(defaultValue = "10") Integer pageSize
     ) {
         IPage<Cluster> list = clustersService.list(pageNum, pageSize);
-        return R.ok(list);
+        return R.ok(list.getRecords());
     }
     @PostMapping
     public R<Cluster> add(@RequestBody Cluster cluster) {

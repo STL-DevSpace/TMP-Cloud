@@ -6,6 +6,7 @@ import cn.hutool.core.lang.Opt;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.dromara.common.core.constant.SystemConstants;
 import org.dromara.common.core.enums.UserStatus;
@@ -47,6 +48,7 @@ import java.util.*;
  */
 @RequiredArgsConstructor
 @Service
+@Slf4j
 @DubboService
 public class RemoteUserServiceImpl implements RemoteUserService {
 
@@ -70,16 +72,40 @@ public class RemoteUserServiceImpl implements RemoteUserService {
     @Override
     public LoginUser getUserInfo(String username, String tenantId) throws UserException {
         return TenantHelper.dynamic(tenantId, () -> {
-            SysUserVo sysUser = userMapper.selectVoOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUserName, username));
+            // 🔍 添加调试日志4: 查询前
+            log.info("==> [getUserInfo] 输入参数 - username: {}, tenantId: {}", username, tenantId);
+
+            // 修改查询条件 - 使用更明确的写法
+            SysUser sysUser = userMapper.selectOne(
+                new LambdaQueryWrapper<SysUser>()
+                    .eq(SysUser::getUserName, username)
+                    .or()
+                    .eq(SysUser::getEmail, username)
+            );
+
+            // 🔍 添加调试日志5: 查询结果
+            if (sysUser != null) {
+                log.info("==> [getUserInfo] 查询成功 - userId: {}, userName: {}, email: {}, status: {}",
+                    sysUser.getUserId(),
+                    sysUser.getUserName(),
+                    sysUser.getEmail(),
+                    sysUser.getStatus());
+            } else {
+                log.error("==> [getUserInfo] 查询失败 - 未找到匹配的用户记录!");
+                log.error("==> [getUserInfo] 请检查: 1.用户名/邮箱是否正确 2.租户ID是否正确 3.数据库数据是否存在");
+            }
+
             if (ObjectUtil.isNull(sysUser)) {
                 throw new UserException("user.not.exists", username);
             }
             if (UserStatus.DISABLE.getCode().equals(sysUser.getStatus())) {
                 throw new UserException("user.blocked", username);
             }
-            // 框架登录不限制从什么表查询 只要最终构建出 LoginUser 即可
-            // 此处可根据登录用户的数据不同 自行创建 loginUser 属性不够用继承扩展就行了
-            return buildLoginUser(sysUser);
+
+            // 转换为 VO
+            SysUserVo sysUserVo = BeanUtil.toBean(sysUser, SysUserVo.class);
+
+            return buildLoginUser(sysUserVo);
         });
     }
 
@@ -414,5 +440,28 @@ public class RemoteUserServiceImpl implements RemoteUserService {
         );
         return StreamUtils.toMap(list, SysUser::getUserId, SysUser::getNickName);
     }
+
+    @Override
+    public RemoteUserVo queryByTenantIdAndEmail(String tenantId, String email) {
+        return TenantHelper.dynamic(tenantId, () -> {
+
+            SysUser sysUser = userService.selectByEmail(email);
+            if (sysUser == null) {
+                return null;
+            }
+
+            RemoteUserVo vo = new RemoteUserVo();
+            vo.setUserId(sysUser.getUserId());
+            vo.setUserName(sysUser.getUserName());
+            vo.setNickName(sysUser.getNickName());
+            vo.setEmail(sysUser.getEmail());
+            vo.setPhonenumber(sysUser.getPhonenumber());
+            vo.setStatus(sysUser.getStatus());
+            // 根据 RemoteUserVo 的字段你可继续补…
+
+            return vo;
+        });
+    }
+
 
 }

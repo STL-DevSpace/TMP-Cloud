@@ -55,12 +55,28 @@ public class PasswordAuthStrategy implements IAuthStrategy {
         String code = loginBody.getCode();
         String uuid = loginBody.getUuid();
 
+        // 🔍 添加调试日志1: 打印登录参数
+        log.info("==> 登录请求 - 租户ID: {}, 输入账号: {}, 密码长度: {}",
+            tenantId, username, password != null ? password.length() : 0);
+
         // 验证码开关
         if (captchaProperties.getEnabled()) {
             validateCaptcha(tenantId, username, code, uuid);
         }
+
         LoginUser loginUser = TenantHelper.dynamic(tenantId, () -> {
+            // 🔍 添加调试日志2: 查询用户前
+            log.info("==> 开始查询用户信息 - 账号: {}", username);
+
             LoginUser user = remoteUserService.getUserInfo(username, tenantId);
+
+            // 🔍 添加调试日志3: 查询用户后
+            if (user != null) {
+                log.info("==> 查询到用户 - 用户ID: {}, 用户名: {}", user.getUserId(), user.getUsername());
+            } else {
+                log.error("==> 未查询到用户信息!");
+            }
+
             loginService.checkLogin(LoginType.PASSWORD, tenantId, username, () -> !BCrypt.checkpw(password, user.getPassword()));
             return user;
         });

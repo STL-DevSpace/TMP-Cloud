@@ -165,4 +165,5 @@ public interface RemoteUserService {
      */
     Map<Long, String> selectUserNamesByIds(List<Long> userIds);
 
+    RemoteUserVo queryByTenantIdAndEmail(String tenantId, String email);
 }

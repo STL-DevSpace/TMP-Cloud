@@ -585,6 +585,16 @@ public class SysUserServiceImpl implements ISysUserService {
         return StreamUtils.toList(userRoles, SysUserRole::getUserId);
     }
 
+    @Override
+    public SysUser selectByEmail(String email) {
+        return baseMapper.selectOne(
+            new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getEmail, email)
+                .last("LIMIT 1")
+        );
+    }
+
+
     /**
      * 通过用户ID查询用户账户
      *

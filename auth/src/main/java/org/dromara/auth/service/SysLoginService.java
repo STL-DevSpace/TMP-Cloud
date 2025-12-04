@@ -36,6 +36,7 @@ import org.dromara.system.api.domain.bo.RemoteSocialBo;
 import org.dromara.system.api.domain.bo.RemoteUserBo;
 import org.dromara.system.api.domain.vo.RemoteSocialVo;
 import org.dromara.system.api.domain.vo.RemoteTenantVo;
+import org.dromara.system.api.domain.vo.RemoteUserVo;
 import org.dromara.system.api.model.LoginUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -142,6 +143,12 @@ public class SysLoginService {
         }
         // 校验用户类型是否存在
         String userType = UserType.getUserType(registerBody.getUserType()).getUserType();
+        //检验邮箱是否已经存在
+        RemoteUserVo userInfo = remoteUserService.queryByTenantIdAndEmail(tenantId, email);
+        if (userInfo != null) {
+            // 查询到了用户，说明邮箱已经存在
+            throw new ServiceException("该邮箱已被使用，请更换其他邮箱");
+        }
 
         boolean captchaEnabled = captchaProperties.getEnabled();
         // 验证码开关
