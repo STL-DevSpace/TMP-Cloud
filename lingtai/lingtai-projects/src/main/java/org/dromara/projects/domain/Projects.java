@@ -2,12 +2,18 @@ package org.dromara.projects.domain;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+
+import java.io.Serial;
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
 @TableName("projects")
-public class Projects {
+public class Projects implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
@@ -26,7 +32,7 @@ public class Projects {
     private Boolean secureAggregation;
     // 总轮数
     private Integer totalEpochs;
-    // 轮数
+    // 已经完成的轮数
     private Integer numRounds;
     // 批次
     private Integer batchSize;
@@ -52,6 +58,7 @@ public class Projects {
     private String status;
     // 进度
     private BigDecimal progress;
+    // 任务ID
     private String taskId;
 
     @TableField(fill = FieldFill.INSERT)

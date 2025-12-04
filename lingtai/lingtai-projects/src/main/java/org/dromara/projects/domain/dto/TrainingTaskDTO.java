@@ -2,9 +2,11 @@ package org.dromara.projects.domain.dto;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import org.dromara.common.core.validate.AddGroup;
+import org.dromara.common.core.validate.EditGroup;
+
 import java.io.Serializable;
 
 /**
@@ -17,12 +19,12 @@ public class TrainingTaskDTO implements Serializable {
 
     private Long id;
 
-    @NotBlank(message = "项目ID不能为空")
-    private String projectId;
+    @NotNull(message = "名称不能为空",groups = {AddGroup.class})
+    private String name;
 
-    @NotNull(message = "训练轮数不能为空")
+    @NotNull(message = "训练轮数不能为空",groups = {AddGroup.class, EditGroup.class})
     @Min(value = 1, message = "训练轮数不能小于1")
-    private Integer epochs;
+    private Integer totalEpochs;
 
     @NotNull(message = "批次大小不能为空")
     @Min(value = 1, message = "批次大小不能小于1")

@@ -5,22 +5,22 @@ FROM bellsoft/liberica-openjdk-rocky:17.0.16-cds
 
 LABEL maintainer="YangYi"
 
-RUN mkdir -p /lingtai/sidecar/logs \
-    /lingtai/sidecar/temp \
+RUN mkdir -p /lingtai/projects/logs \
+    /lingtai/projects/temp \
     /lingtai/skywalking/agent
 
-WORKDIR /lingtai/sidecar
+WORKDIR /lingtai/projects
 
-ENV SERVER_PORT=9802 LANG=C.UTF-8 LC_ALL=C.UTF-8 JAVA_OPTS=""
+ENV SERVER_PORT=9805 LANG=C.UTF-8 LC_ALL=C.UTF-8 JAVA_OPTS=""
 
 EXPOSE ${SERVER_PORT}
 
-ADD ./target/lingtai-sidecar.jar ./app.jar
+ADD ./target/lingtai-projects.jar ./app.jar
 
 SHELL ["/bin/bash", "-c"]
 
 ENTRYPOINT java -Djava.security.egd=file:/dev/./urandom -Dserver.port=${SERVER_PORT} \
-           #-Dskywalking.agent.service_name=lingtai-sidecar \
+           #-Dskywalking.agent.service_name=lingtai-projects \
            #-javaagent:/lingtai/skywalking/agent/skywalking-agent.jar \
            -XX:+HeapDumpOnOutOfMemoryError -XX:+UseZGC ${JAVA_OPTS} \
            -jar app.jar

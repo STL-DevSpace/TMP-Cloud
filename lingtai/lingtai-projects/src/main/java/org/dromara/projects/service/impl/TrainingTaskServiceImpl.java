@@ -2,56 +2,55 @@ package org.dromara.projects.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.edgeai.training.api.*;
-import com.edgeai.training.api.TrainingServiceGrpc;
-import org.dromara.projects.domain.TrainingTask;
-import org.dromara.projects.domain.dto.TrainingTaskDTO;
-import org.dromara.projects.domain.vo.TrainingTaskVO;
-import org.dromara.projects.mapper.TrainingTaskMapper;
-import org.dromara.projects.service.ITrainingTaskService;
 import io.grpc.StatusRuntimeException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.projects.domain.TrainingTask;
+import org.dromara.projects.domain.dto.TrainingTaskDTO;
+import org.dromara.projects.domain.vo.TrainingTaskVO;
+import org.dromara.projects.enums.TrainingTaskStatus;
+import org.dromara.projects.mapper.TrainingTaskMapper;
+import org.dromara.projects.service.ITrainingTaskService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 训练任务Service实现
+ *
+ * @author 86185
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class TrainingTaskServiceImpl extends ServiceImpl<TrainingTaskMapper, TrainingTask>
-    implements ITrainingTaskService {
+public class TrainingTaskServiceImpl implements ITrainingTaskService {
 
     private final TrainingServiceGrpc.TrainingServiceBlockingStub trainingServiceStub;
+
+    private final TrainingTaskMapper baseMapper;
 
     @Override
     public List<TrainingTaskVO> selectTaskList(TrainingTaskDTO dto) {
         LambdaQueryWrapper<TrainingTask> wrapper = new LambdaQueryWrapper<>();
-
-        if (dto.getProjectId() != null) {
-            wrapper.eq(TrainingTask::getProjectId, dto.getProjectId());
-        }
+        Long userId = LoginHelper.getUserId();
+        wrapper.eq(TrainingTask::getUserId, userId);
 
         wrapper.orderByDesc(TrainingTask::getCreateTime);
 
-        List<TrainingTask> list = this.list(wrapper);
-        return list.stream()
-            .map(this::convertToVO)
-            .collect(Collectors.toList());
+        return baseMapper.selectVoList(wrapper);
     }
 
     @Override
     public TrainingTaskVO selectTaskById(Long id) {
-        TrainingTask task = this.getById(id);
+        TrainingTaskVO task = baseMapper.selectVoById(id);
         if (task == null) {
             throw new RuntimeException("训练任务不存在");
         }
-        return convertToVO(task);
+        return task;
     }
 
     @Override
@@ -60,73 +59,70 @@ public class TrainingTaskServiceImpl extends ServiceImpl<TrainingTaskMapper, Tra
         // 1. 保存到数据库
         TrainingTask task = new TrainingTask();
         BeanUtil.copyProperties(dto, task);
-        task.setStatus("PENDING");
-        return this.save(task);
+        task.setUserId(LoginHelper.getUserId());
+        task.setStatus(TrainingTaskStatus.PENDING);
+        return baseMapper.insert(task) > 0;
     }
 
     @Override
     public TrainingTaskVO startTask(TrainingTaskDTO dto) {
 
-        String projectId = dto.getProjectId();
-        LambdaQueryWrapper<TrainingTask> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(TrainingTask::getProjectId, projectId);
-        TrainingTask task = this.getOne(wrapper);
-        if (task == null ) {
+        Long taskId = dto.getId();
+        TrainingTask task = baseMapper.selectById(taskId);
+        if (task == null) {
             throw new RuntimeException("训练任务不存在");
         }
-        if (!task.getStatus().equals("PENDING")) {
+        if (!task.getStatus().equals(TrainingTaskStatus.PENDING)) {
             throw new RuntimeException("训练任务已启动");
         }
 
         try {
             // 2. 调用 gRPC 启动训练
             PiTrainRequest request = PiTrainRequest.newBuilder()
-                .setProjectId(projectId)
-                .setEpochs(dto.getEpochs())
+                .setProjectId(taskId.toString())
+                .setEpochs(dto.getTotalEpochs())
                 .setBatchSize(dto.getBatchSize())
                 .setLr(dto.getLr())
                 .build();
 
-            log.info("Starting training task via gRPC: {}", projectId);
+            log.info("Starting training task via gRPC: {}", taskId);
             PiTrainReply reply = trainingServiceStub.piTrain(request);
 
             // 3. 更新训练结果
             task.setFinalLoss(reply.getFinalLoss());
-            task.setStatus(reply.getStatus());
+            task.setStatus(TrainingTaskStatus.valueOf(reply.getStatus()));
             task.setRounds(reply.getRounds());
             task.setLogPath(reply.getLogPath());
-            this.updateById(task);
+            baseMapper.updateById(task);
 
-            log.info("Training task started successfully: {}", projectId);
+            log.info("Training task started successfully: {}", taskId);
             return convertToVO(task);
 
         } catch (StatusRuntimeException e) {
             log.error("gRPC call failed: {}", e.getMessage(), e);
-            task.setStatus("FAILED");
+            task.setStatus(TrainingTaskStatus.FAILED);
             task.setRemark("gRPC调用失败: " + e.getMessage());
-            this.updateById(task);
+            baseMapper.updateById(task);
             throw new RuntimeException("启动训练失败: " + e.getMessage());
         }
     }
 
     @Override
-    public Boolean pauseTask(String projectId) {
+    public Boolean pauseTask(Long taskId) {
         try {
             PauseRequest request = PauseRequest.newBuilder()
-                .setProjectId(projectId)
+                .setProjectId(taskId.toString())
                 .build();
 
-            log.info("Pausing training task: {}", projectId);
+            log.info("Pausing training task: {}", taskId);
             PauseReply reply = trainingServiceStub.pauseTrain(request);
 
             if (reply.getSuccess()) {
                 // 更新数据库状态
-                LambdaQueryWrapper<TrainingTask> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(TrainingTask::getProjectId, projectId);
-                TrainingTask task = this.getOne(wrapper);
+                TrainingTask task = baseMapper.selectById(taskId);
                 if (task != null) {
-                    task.setStatus("PAUSED");
-                    this.updateById(task);
+                    task.setStatus(TrainingTaskStatus.PAUSED);
+                    baseMapper.updateById(task);
                 }
             }
 
@@ -138,23 +134,21 @@ public class TrainingTaskServiceImpl extends ServiceImpl<TrainingTaskMapper, Tra
     }
 
     @Override
-    public Boolean stopTask(String projectId) {
+    public Boolean stopTask(Long taskId) {
         try {
             StopRequest request = StopRequest.newBuilder()
-                .setProjectId(projectId)
+                .setProjectId(taskId.toString())
                 .build();
 
-            log.info("Stopping training task: {}", projectId);
+            log.info("Stopping training task: {}", taskId);
             StopReply reply = trainingServiceStub.stopTrain(request);
 
             if (reply.getSuccess()) {
                 // 更新数据库状态
-                LambdaQueryWrapper<TrainingTask> wrapper = new LambdaQueryWrapper<>();
-                wrapper.eq(TrainingTask::getProjectId, projectId);
-                TrainingTask task = this.getOne(wrapper);
+                TrainingTask task = baseMapper.selectById(taskId);
                 if (task != null) {
-                    task.setStatus("STOPPED");
-                    this.updateById(task);
+                    task.setStatus(TrainingTaskStatus.STOPPED);
+                    baseMapper.updateById(task);
                 }
             }
 
@@ -166,25 +160,23 @@ public class TrainingTaskServiceImpl extends ServiceImpl<TrainingTaskMapper, Tra
     }
 
     @Override
-    public TrainingTaskVO getTaskProgress(String projectId) {
+    public TrainingTaskVO getTaskProgress(Long taskId) {
         try {
             ProgressRequest request = ProgressRequest.newBuilder()
-                .setProjectId(projectId)
+                .setProjectId(taskId.toString())
                 .build();
 
-            log.info("Getting training progress: {}", projectId);
+            log.info("Getting training progress: {}", taskId);
             ProgressReply reply = trainingServiceStub.getProgress(request);
 
             // 更新数据库中的进度信息
-            LambdaQueryWrapper<TrainingTask> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(TrainingTask::getProjectId, projectId);
-            TrainingTask task = this.getOne(wrapper);
+            TrainingTask task = baseMapper.selectById(taskId);
 
             if (task != null) {
-                task.setProgress(reply.getProgress());
+                task.setProgress(BigDecimal.valueOf(reply.getProgress()));
                 task.setRounds(reply.getRound());
                 task.setCurrentLoss(reply.getLoss());
-                this.updateById(task);
+                baseMapper.updateById(task);
                 return convertToVO(task);
             }
 
@@ -198,17 +190,17 @@ public class TrainingTaskServiceImpl extends ServiceImpl<TrainingTaskMapper, Tra
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean deleteTask(Long id) {
-        TrainingTask task = this.getById(id);
+        TrainingTask task = baseMapper.selectById(id);
         if (task == null) {
             throw new RuntimeException("训练任务不存在");
         }
 
         // 如果任务正在运行，先停止
-        if ("RUNNING".equals(task.getStatus())) {
-            stopTask(task.getProjectId());
+        if (TrainingTaskStatus.RUNNING.equals(task.getStatus())) {
+            stopTask(task.getId());
         }
 
-        return this.removeById(id);
+        return baseMapper.deleteById(id) > 0;
     }
 
     /**

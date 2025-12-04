@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 训练任务Service接口
  */
-public interface ITrainingTaskService extends IService<TrainingTask> {
+public interface ITrainingTaskService {
 
     /**
      * 查询训练任务列表
@@ -34,17 +34,17 @@ public interface ITrainingTaskService extends IService<TrainingTask> {
     /**
      * 暂停训练任务
      */
-    Boolean pauseTask(String projectId);
+    Boolean pauseTask(Long projectId);
 
     /**
      * 停止训练任务
      */
-    Boolean stopTask(String projectId);
+    Boolean stopTask(Long projectId);
 
     /**
      * 查询训练进度
      */
-    TrainingTaskVO getTaskProgress(String projectId);
+    TrainingTaskVO getTaskProgress(Long projectId);
 
     /**
      * 删除训练任务
