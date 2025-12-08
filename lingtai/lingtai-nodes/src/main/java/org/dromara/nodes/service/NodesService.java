@@ -10,4 +10,6 @@ public interface NodesService {
 
 
     Nodes addByClusterId(Long clusterId, Nodes  node);
+
+    List<Nodes> visulazation(Long projectid);
 }

@@ -1,7 +1,9 @@
 package org.dromara.common.oss.entity;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * 上传返回体
@@ -10,6 +12,8 @@ import lombok.Data;
  */
 @Data
 @Builder
+@AllArgsConstructor // 生成 public 全参构造器
+@NoArgsConstructor  // 生成 public 无参构造器（可选，按需添加）
 public class UploadResult {
 
     /**

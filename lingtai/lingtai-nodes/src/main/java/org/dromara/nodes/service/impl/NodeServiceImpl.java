@@ -12,6 +12,8 @@ import org.dromara.nodes.service.ClustersService;
 import org.dromara.nodes.service.NodesService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @Service
 public class NodeServiceImpl implements NodesService {
@@ -40,6 +42,14 @@ public class NodeServiceImpl implements NodesService {
         Cluster cluster = clustersService.getDetail(clusterId);
         node.setProjectId(cluster.getProjectId());
         return node;
+    }
+
+    @Override
+    public List<Nodes> visulazation(Long projectid) {
+        //根据project_id查询nodes
+        LambdaQueryWrapper<Nodes> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Nodes::getProjectId, projectid);
+        return baseMapper.selectList(queryWrapper);
     }
 
 }

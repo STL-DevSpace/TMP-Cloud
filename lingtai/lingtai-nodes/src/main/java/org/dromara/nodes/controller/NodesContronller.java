@@ -7,10 +7,7 @@ import org.apache.dubbo.config.spring.context.annotation.EnableDubbo;
 import org.dromara.common.core.domain.R;
 import org.dromara.nodes.entity.Nodes;
 import org.dromara.nodes.service.NodesService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -30,11 +27,16 @@ public class NodesContronller {
      * @return
      */
     @GetMapping
-    public R<IPage<Nodes>> list(
+    public R<List<Nodes>> list(
         @RequestParam(defaultValue = "1") Integer pageNum,
         @RequestParam(defaultValue = "10") Integer pageSize
     ) {
         IPage<Nodes> list = nodesService.list(pageNum, pageSize);
+        return R.ok(list.getRecords());
+    }
+    @GetMapping("/visualization/{projectid}")
+    public R<List<Nodes>> visulazation(@PathVariable("projectid") Long projectid) {
+        List<Nodes> list = nodesService.visulazation(projectid);
         return R.ok(list);
     }
 }

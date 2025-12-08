@@ -33,9 +33,12 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
-
+import org.dromara.common.oss.core.IMultipartUploader;
 /**
  * S3 存储协议 所有兼容S3协议的云厂商均支持
  * 阿里云 腾讯云 七牛云 minio
@@ -43,7 +46,7 @@ import java.util.function.Consumer;
  * @author AprilWind
  */
 @Slf4j
-public class OssClient {
+public class OssClient implements IMultipartUploader{
 
     /**
      * 服务商
@@ -522,4 +525,92 @@ public class OssClient {
         return AccessPolicyType.getByType(properties.getAccessPolicy());
     }
 
+    /**
+     * 1. 启动分块上传任务
+     */
+    @Override
+    public String startMultipartUpload(String objectName, String contentType) throws OssException {
+        // ⚠️ 实际代码：在此处根据 properties.getType() 路由到具体的云服务商 SDK 逻辑
+        //TODO 根据 properties.getType() 获取对应的云服务商 SDK
+        log.info("Starting multipart upload for object: {} using service: {}", objectName, "tencent");
+
+        // 示例：这里需要根据 properties.getType() 调用 Aliyun/Tencent/AWS SDK 的 initiateMultipartUpload 方法
+        // 由于没有具体的 SDK 代码，这里仅返回一个模拟的 UploadId
+        if ("aliyun".equalsIgnoreCase("tencent")) {
+            // return aliyunClient.initiateMultipartUpload(objectName, contentType);
+            return "aliyun-" + IdUtil.fastSimpleUUID();
+        } else if ("tencent".equalsIgnoreCase("tencent") ){
+            // return tencentClient.createMultipartUpload(objectName, contentType);
+            return "tencent-" + IdUtil.fastSimpleUUID();
+        }
+
+        throw new OssException("当前配置[" + "tencent" + "]不支持分块上传");
+    }
+
+    /**
+     * 2. 上传文件分块
+     */
+    @Override
+    public Map<String, Object> uploadPart(String uploadId, int partNumber, InputStream content, long contentLength) throws OssException {
+        log.info("Uploading part {} with size {} for uploadId: {}", partNumber, contentLength, uploadId);
+
+        // ⚠️ 实际代码：在此处根据 uploadId (或 properties.getType()) 路由到具体的 SDK 逻辑
+        // 示例：调用 SDK 的 uploadPart API
+        if (uploadId.startsWith("aliyun")) {
+            // PartETag partEtag = aliyunClient.uploadPart(uploadId, partNumber, content, contentLength);
+
+            Map<String, Object> partInfo = new HashMap<>(); // 🚀 需要 Map 包装 PartNumber 和 ETag
+            partInfo.put("PartNumber", partNumber);
+            partInfo.put("ETag", "ETag-" + IdUtil.fastSimpleUUID()); // 实际是 SDK 返回的 ETag
+            partInfo.put("size", contentLength); // 方便上层计算总大小
+            return partInfo;
+        }
+
+        // ... 其他云服务商逻辑 ...
+
+        throw new OssException("不支持的分块上传任务ID: " + uploadId);
+    }
+
+    /**
+     * 3. 完成分块上传任务
+     */
+    @Override
+    public UploadResult completeMultipartUpload(String uploadId, String objectName, List<Map<String, Object>> partsList) throws OssException {
+        log.info("Completing multipart upload for object: {} with {} parts", objectName, partsList.size());
+
+        // ⚠️ 实际代码：在此处根据 uploadId 路由到具体的 SDK 逻辑，并执行合并/完成操作
+        if (uploadId.startsWith("aliyun")) {
+            // CompleteMultipartUploadResult result = aliyunClient.completeMultipartUpload(uploadId, objectName, partsList);
+
+            // 构造 UploadResult 返回给上层
+            UploadResult result = new UploadResult();
+            result.setUrl(getUrl() + "/" + objectName); // 假设 getUrl() 存在
+            result.setFilename(objectName);
+            return result;
+        }
+
+        // ... 其他云服务商逻辑 ...
+
+        throw new OssException("不支持的分块上传任务ID: " + uploadId);
+    }
+
+    /**
+     * 4. 取消分块上传
+     */
+    @Override
+    public void abortMultipartUpload(String uploadId) throws OssException {
+        log.warn("Aborting multipart upload for ID: {}", uploadId);
+
+        // ⚠️ 实际代码：在此处根据 uploadId 路由到具体的 SDK 逻辑，并执行中止操作
+        if (uploadId.startsWith("aliyun")) {
+            // aliyunClient.abortMultipartUpload(uploadId);
+            return;
+        }
+        if (uploadId.startsWith("tencent")) {
+            // tencentClient.abortMultipartUpload(uploadId);
+            return;
+        }
+
+        // ... 其他云服务商逻辑 ...
+    }
 }
