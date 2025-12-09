@@ -2,6 +2,7 @@ package org.dromara.data.service;
 
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import org.dromara.data.entity.dto.FileInfoDTO;
 import org.dromara.data.entity.dto.ModelsDTO;
 
 
@@ -54,7 +55,7 @@ public interface IModelsService {
      * @param dto 模型DTO
      * @return 创建结果
      */
-    boolean createModel(ModelsDTO dto);
+    ModelsDTO createModel(ModelsDTO dto);
 
     /**
      * 更新模型信息
@@ -120,6 +121,12 @@ public interface IModelsService {
     List<ModelsDTO> getModelsByVersion(String version);
 
     boolean importModelFromHub(ModelsDTO dto);
+
+    boolean importModelFromHubWithProgress(ModelsDTO dto, String taskId);
+
+    String startImportAsync(ModelsDTO dto);
+
+    List<FileInfoDTO> getFileInfo(Integer id);
 
     /**
      * 模型统计信息DTO

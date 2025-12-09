@@ -3,6 +3,7 @@ package org.dromara.data.entity.dto;
 
 import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
+import org.dromara.data.entity.ModelFiles;
 import org.dromara.data.entity.Models;
 
 import java.io.Serializable;
@@ -71,4 +72,9 @@ public class ModelsDTO implements Serializable {
      * 更新时间
      */
     private Timestamp updatedTime;
+
+    /**
+     * 模型文件类
+     */
+    private ModelFiles[] modelFiles;
 }

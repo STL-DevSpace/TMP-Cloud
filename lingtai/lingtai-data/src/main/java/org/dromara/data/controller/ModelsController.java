@@ -4,15 +4,20 @@ package org.dromara.data.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 
+import org.dromara.data.entity.Models;
+import org.dromara.data.entity.dto.FileInfoDTO;
 import org.dromara.data.entity.dto.ModelsDTO;
+import org.dromara.data.progress.ProgressStore;
 import org.dromara.data.service.IModelsService;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Models 控制器
@@ -23,6 +28,8 @@ import java.util.List;
 public class ModelsController {
 
     private final IModelsService modelsService;
+    @Resource
+    private ProgressStore progressStore;
 
     /**
      * 查询所有模型
@@ -85,10 +92,10 @@ public class ModelsController {
      * @return 创建结果
      */
     @PostMapping
-    public R<Void> createModel(@Validated @RequestBody ModelsDTO dto) {
-        boolean success = modelsService.createModel(dto);
-        if (success) {
-            return R.ok("模型创建成功");
+    public R<ModelsDTO> createModel(@Validated @RequestBody ModelsDTO dto) {
+        ModelsDTO model = modelsService.createModel(dto);
+        if (model != null) {
+            return R.ok(model);
         }
         return R.fail("模型创建失败");
     }
@@ -139,31 +146,30 @@ public class ModelsController {
         }
         return R.fail("模型批量删除失败");
     }
-    /**
-     * 从 HuggingFace Hub 导入模型（启动异步导入任务）
-     * @param dto 包含 Hub URL、本地名称和描述的 DTO。
-     * (假设 ModelsDTO 中已包含 hubUrl, name, description 字段)
-     * @return 导入任务启动结果
-     */
     @PostMapping("/import")
-    public R<Void> importModelFromHub(@Validated @RequestBody ModelsDTO dto) {
-        // 检查关键的 Hub 标识符（假设 ModelsDTO 中有一个 getHubUrl() 方法）
-        // 如果您的 DTO 中没有 hubUrl 字段，请根据实际字段名进行调整，例如 getSourceUrl()
+    public R<String> importModelFromHub(@Validated @RequestBody ModelsDTO dto) {
+
         if (dto.getHubUrl() == null || dto.getHubUrl().isEmpty()) {
-            return R.fail("Hub ID (URL) 不能为空");
+            return R.fail("Hub URL 不能为空");
         }
 
-        // 核心逻辑：调用 Service 层启动异步导入任务
-        // 假设 modelsService 中有一个 importModelFromHub 方法
-        boolean success = modelsService.importModelFromHub(dto);
+        String taskId = modelsService.startImportAsync(dto);
 
-        if (success) {
-            // 返回 200 OK，表示导入任务已成功排队或启动
-            return R.ok("模型导入任务已成功启动");
-        }
-        // 如果 Service 层返回 false，表示启动失败
-        return R.fail("模型导入任务启动失败，请检查 Hub ID 或系统配置");
+        return R.ok(taskId);
     }
+
+    /**
+     * 查询导入进度（返回完整 Progress 对象）
+     */
+    @GetMapping("/import/progress/{taskId}")
+    public R<ProgressStore.Progress> getImportProgress(@PathVariable String taskId) {
+        ProgressStore.Progress progress = progressStore.get(taskId);
+        if (progress == null) {
+            return R.fail("任务不存在");
+        }
+        return R.ok(progress);
+    }
+
 
 
     /**
@@ -181,5 +187,16 @@ public class ModelsController {
             return R.ok("模型部署成功");
         }
         return R.fail("模型部署失败或模型不存在");
+    }
+    /**
+     * 用模型id获取对应文件信息
+     */
+    @GetMapping("/{id}/file")
+    public R<List<FileInfoDTO>> getFileInfo(@PathVariable Integer id) {
+        List<FileInfoDTO> fileInfo = modelsService.getFileInfo(id);
+        if (fileInfo == null) {
+            return R.fail("模型不存在");
+        }
+        return R.ok(fileInfo);
     }
 }

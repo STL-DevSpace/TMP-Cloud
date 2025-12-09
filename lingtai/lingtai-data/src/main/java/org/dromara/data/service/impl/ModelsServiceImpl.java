@@ -1,25 +1,36 @@
 package org.dromara.data.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.data.entity.ModelFiles;
 import org.dromara.data.entity.Models;
+import org.dromara.data.entity.dto.FileInfoDTO;
 import org.dromara.data.entity.dto.ModelsDTO;
 import org.dromara.data.mapper.DataMapper;
-import org.dromara.data.service.IHubImportTaskService;
+import org.dromara.data.mapper.FileMapper;
+import org.dromara.data.progress.ProgressStore;
 import org.dromara.data.service.IModelsService;
+import org.dromara.data.utils.CosUtils; // 导入 CosUtils
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.LongConsumer;
+import java.util.stream.Collectors;
 
 /**
  * Models 服务实现类
@@ -31,9 +42,15 @@ public class ModelsServiceImpl implements IModelsService {
 
 
     private final DataMapper dataMapper;
-
+    private final FileMapper fileMapper;
     @Resource
-    private IHubImportTaskService hubImportTaskService;
+    private final CosUtils cosUtils; // 注入 CosUtils
+    @Resource
+    private final ProgressStore progressStore;
+
+    // 移除 IHubImportTaskService 相关的注入
+    // @Resource
+    // private IHubImportTaskService hubImportTaskService;
 
     @Override
     public List<ModelsDTO> getAllModels() {
@@ -92,38 +109,96 @@ public class ModelsServiceImpl implements IModelsService {
         return dataMapper.selectVoList(queryWrapper);
     }
 
+// 假设你的 Service 类中已经注入了 FileMapper
+// @Autowired
+// private FileMapper fileMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean createModel(ModelsDTO dto) {
+    public ModelsDTO createModel(ModelsDTO dto) {
         if (dto == null) {
             log.error("创建模型失败: DTO为空");
-            return false;
+            return null;
         }
 
         // 检查模型名称是否已存在
         if (isModelNameExists(dto.getName(), dto.getUserId())) {
             log.warn("创建模型失败: 模型名称已存在 - {}", dto.getName());
-            return false;
+            return null;
         }
+
+        // 1. 获取用户ID
         String loginStr = StpUtil.getLoginId().toString();
         String loginId = loginStr.substring(loginStr.indexOf(":")+1);
         Long userId = Long.valueOf(loginId);
+
+        // 2. 准备 Models 主表数据
         Models model = new Models();
         model.setUserId(userId);
         model.setName(dto.getName());
         model.setDescription(dto.getDescription());
-        model.setFilePath(dto.getFilePath());
+        model.setFilePath(dto.getFilePath()); // 文件夹路径
         model.setVersion(dto.getVersion());
         model.setSize(dto.getSize());
         model.setStatus(dto.getStatus() != null ? dto.getStatus() : "Inactive");
+        // TODO: 补充设置 type 字段 (ModelsDTO 中有但你没有设置)
 
         Timestamp now = new Timestamp(System.currentTimeMillis());
         model.setCreatedTime(now);
         model.setUpdatedTime(now);
 
+        // 3. 【关键步骤 A】保存 Models 主表数据
         int result = dataMapper.insert(model);
-        log.info("创建模型{}: ID={}, Name={}", result > 0 ? "成功" : "失败", model.getId(), model.getName());
-        return result > 0;
+
+        if (result > 0 && model.getId() != null) {
+            log.info("主表 Models 创建成功: ID={}, Name={}", model.getId(), model.getName());
+
+            // =======================================================
+            // 4. 【关键修改区域】处理 ModelFiles 数组
+            ModelFiles[] modelFilesArray = dto.getModelFiles();
+
+            if (modelFilesArray != null && modelFilesArray.length > 0) {
+                int successCount = 0;
+                int  modelId = model.getId(); // 获取新生成的模型ID
+
+                // 循环遍历数组中的每一个 ModelFiles 对象
+                for (ModelFiles file : modelFilesArray) {
+                    if (file == null) continue;
+
+                    // 设置外键关联ID
+                    file.setModelId(modelId);
+                    // 设置创建时间
+                    file.setCreatedTime(now);
+
+                    // 【可选】设置其他默认值 (isPrimary应该由前端发送，这里作为保险)
+                    if (file.getIsPrimary() == null) {
+                        // 如果前端没有标记，默认为非主文件 (0)
+                        file.setIsPrimary(0);
+                    }
+
+                    // 调用 FileMapper 存储单条文件详情
+                    if (fileMapper.insert(file) > 0) {
+                        successCount++;
+                    }
+                }
+
+                log.info("子表 ModelFiles 批量存储完成: Model ID={}, 成功插入 {} / {} 条记录",
+                    modelId, successCount, modelFilesArray.length);
+            }
+            // =======================================================
+
+        } else {
+            log.error("创建模型失败: 插入 Models 表失败");
+            return null;
+        }
+
+        // 5. 组装返回的 DTO
+        ModelsDTO modelUpdate = new ModelsDTO();
+        BeanUtils.copyProperties(model, modelUpdate);
+        // 将 ModelFiles 数组复制到返回的 DTO 中
+        modelUpdate.setModelFiles(dto.getModelFiles());
+
+        return modelUpdate;
     }
 
     @Override
@@ -375,52 +450,392 @@ public class ModelsServiceImpl implements IModelsService {
         return dataMapper.selectVoList(queryWrapper);
     }
 
-    /**
-     * 🚀 实现 IModelsService 接口中的 Hub 模型导入方法
-     * 职责：1. 在数据库中创建初始模型记录（状态为 'Importing'）。
-     * 2. 启动异步下载任务。
-     * @param dto 包含 hubUrl, name, description 的 DTO
-     * @return 任务是否成功启动
-     */
     @Override
-    @Transactional // 确保数据库操作是原子的
     public boolean importModelFromHub(ModelsDTO dto) {
-        if (dto.getHubUrl() == null || dto.getHubUrl().isEmpty()) {
+        return false;
+    }
+
+    /**
+     * 真正执行下载并上传的方法（同步执行），接收外部传入的 taskId 用于上报进度
+     * <p>
+     * 事务注意：本方法会在出现异常时尝试将 DB 状态设为 Error，
+     * 由于是跨 IO（可能分片上传很久），需要谨慎考虑事务边界。
+     *
+     * @return
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean importModelFromHubWithProgress(ModelsDTO dto, String taskId) {
+        if (dto == null || dto.getHubUrl() == null || dto.getHubUrl().isEmpty()) {
+            progressStore.fail(taskId, "Hub URL 为空");
             return false;
         }
 
+        // 1) 创建初始数据库记录（Importing）
+        Models model = new Models();
+        // 设置登录用户 ID（从 Sa-Token 中解析）
         try {
-            // 1. 构造模型实体并设置初始状态
-            Models model = BeanUtil.copyProperties(dto, Models.class);
-
-            // 必须设置的关键字段：
-            model.setStatus("Importing"); // 初始状态：正在导入中
-            model.setHubUrl(dto.getHubUrl()); // 保存 Hub URL
-            model.setCreatedTime(new Timestamp(System.currentTimeMillis()));
-            model.setUpdatedTime(Timestamp.valueOf(LocalDateTime.now()));
             String loginStr = StpUtil.getLoginId().toString();
-            String loginId = loginStr.substring(loginStr.indexOf(":")+1);
+            String loginId = loginStr.contains(":") ? loginStr.substring(loginStr.indexOf(":")+1) : loginStr;
             Long userId = Long.valueOf(loginId);
             model.setUserId(userId);
-            // 2. 将初始记录存入数据库
-            int result = dataMapper.insert(model);
-            if (result != 1) {
-                // 如果插入失败，抛出异常以回滚事务
-                throw new RuntimeException("Failed to create initial model record.");
+        } catch (Exception e) {
+            log.warn("无法解析登录用户ID，使用 null: {}", e.getMessage());
+        }
+
+        model.setName(dto.getName());
+        model.setDescription(dto.getDescription());
+        model.setVersion(dto.getVersion());
+        model.setHubUrl(dto.getHubUrl());
+        model.setStatus("Importing");
+        model.setCreatedTime(new Timestamp(System.currentTimeMillis()));
+        model.setUpdatedTime(new Timestamp(System.currentTimeMillis()));
+
+        int insertResult = dataMapper.insert(model);
+        if (insertResult != 1) {
+            progressStore.fail(taskId, "创建模型记录失败");
+            throw new RuntimeException("创建模型记录失败");
+        }
+        log.info("创建初始模型记录成功，id={}", model.getId());
+        progressStore.updatePercent(taskId, 1, "已创建数据库记录");
+
+        // 2) 准备文件名（安全化）
+        String safeName = (dto.getName() == null || dto.getName().trim().isEmpty())
+            ? ("model_" + model.getId())
+            : dto.getName().replaceAll("[^a-zA-Z0-9._-]", "_");
+        String fileName = model.getId() + "_" + safeName;
+
+        HttpURLConnection conn = null;
+        InputStream input = null;
+        try {
+            // 3) 打开 Hub URL 流（支持 http/https）
+            URL url = new URL(dto.getHubUrl());
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(15_000);
+            conn.setReadTimeout(120_000);
+            conn.setRequestProperty("User-Agent", "EdgeAI-Model-Importer/1.0");
+            conn.connect();
+
+            int responseCode = conn.getResponseCode();
+            if (responseCode >= 400) {
+                String msg = "下载失败，HTTP 响应码: " + responseCode;
+                log.error(msg);
+                progressStore.fail(taskId, msg);
+                // 将模型标记为 Error
+                markModelError(model.getId(), "下载失败 HTTP " + responseCode);
+                return false;
             }
 
-            // 3. 启动异步导入任务
-            // 将刚创建的数据库记录ID和Hub URL传递给后台任务
-            hubImportTaskService.startImport(model.getId(), dto.getHubUrl());
+            long totalSize = conn.getContentLengthLong();
+            if (totalSize <= 0) {
+                log.warn("远端未返回 Content-Length（或为0），将按未知大小处理");
+                // 若 totalSize <= 0，进度条将以已上传字节数为基准展示（可能无法做百分比）
+            }
 
+            input = conn.getInputStream();
+
+            progressStore.updatePercent(taskId, 5, "开始下载并上传到 COS");
+
+            // 4) 定义回调：cosUtils 会在每次分片上传后回调已上传字节数。
+            LongConsumer progressCallback = uploadedBytes -> {
+                try {
+                    int percent;
+                    if (totalSize > 0) {
+                        percent = (int) Math.min(100, (uploadedBytes * 100.0) / totalSize);
+                    } else {
+                        // 当 totalSize 未知时，无法精确计算百分比，改为根据字节数做粗略展示（最多到99）
+                        long kb = uploadedBytes / 1024;
+                        percent = (int) Math.min(99, 1 + kb / 1024); // 每 MB 增 1%
+                    }
+                    progressStore.updatePercent(taskId, percent, "上传中 " + percent + "%");
+                } catch (Exception e) {
+                    log.warn("进度回调处理异常", e);
+                }
+            };
+
+            // 5) 调用 CosUtils 的流式上传（分块上传），传入 InputStream 和 progressCallback
+            String cosKey = cosUtils.uploadStreamWithProgress(input, fileName, totalSize, progressCallback);
+
+            // 6) 上传成功，更新 DB
+            Models update = new Models();
+            update.setId(model.getId());
+            update.setFilePath(cosKey);
+            update.setSize(totalSize > 0 ? totalSize : null);
+            update.setStatus("Active");
+            update.setUpdatedTime(new java.sql.Timestamp(System.currentTimeMillis()));
+            dataMapper.updateById(update);
+
+            progressStore.success(taskId, "上传完成，模型已激活");
+            log.info("任务成功，modelId={}, cosKey={}", model.getId(), cosKey);
             return true;
+
         } catch (Exception e) {
-            // 记录错误日志
-            System.err.println("Failed to start Hub import task for " + dto.getHubUrl() + ": " + e.getMessage());
-            // 抛出运行时异常，确保 @Transactional 可以回滚（如果数据库插入成功但任务启动失败）
-            throw new RuntimeException("模型导入任务启动失败", e);
+            log.error("导入任务失败，modelId={}, url={}", model.getId(), dto.getHubUrl(), e);
+            progressStore.fail(taskId, "任务失败：" + e.getMessage());
+
+            // 标记 DB 为 Error（不回滚 insert，保持记录用于排查）
+            markModelError(model.getId(), e.getMessage());
+            return false;
+
+        } finally {
+            // 7) 关闭资源
+            try {
+                if (input != null) input.close();
+            } catch (Exception ignored) {}
+            if (conn != null) conn.disconnect();
         }
     }
+    /**
+     * 从 HuggingFace 下载模型文件（支持大文件）。
+     * @param hubUrl 如：https://huggingface.co/xxxx/xxx/resolve/main/model.safetensors
+     * @return 下载后的本地临时文件 File
+     */
+    public File downloadModelFromHub(String hubUrl) throws IOException {
+
+        log.info("[IMPORT] 开始下载 HuggingFace 模型: {}", hubUrl);
+
+        // 为下载的模型创建临时文件（自动随机命名）
+        String fileName = hubUrl.substring(hubUrl.lastIndexOf("/") + 1);
+        File tempFile = File.createTempFile("hf_", "_" + fileName);
+
+        // 重试次数（防止网络抖动）
+        int maxRetry = 3;
+
+        for (int attempt = 1; attempt <= maxRetry; attempt++) {
+            try {
+                return doDownload(hubUrl, tempFile);
+            } catch (Exception e) {
+                log.warn("[IMPORT] 下载失败 attempt={}/{}: {}", attempt, maxRetry, e.getMessage());
+
+                if (attempt == maxRetry) {
+                    throw new IOException("下载模型失败（重试次数耗尽）: " + e.getMessage());
+                }
+
+                try { Thread.sleep(1000); } catch (Exception ignored) {}
+            }
+        }
+
+        return tempFile; // 理论不会到这里
+    }
+
+
+    /**
+     * 执行一次实际下载
+     */
+    private File doDownload(String hubUrl, File destFile) throws IOException {
+
+        URL url = new URL(hubUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(10000);
+        conn.setRequestMethod("GET");
+        conn.setInstanceFollowRedirects(true);
+        conn.addRequestProperty("User-Agent", "Mozilla/5.0");
+
+        int status = conn.getResponseCode();
+
+        // HuggingFace 有时会 302 跳转到真实原始文件地址
+        if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
+            status == HttpURLConnection.HTTP_MOVED_PERM ||
+            status == HttpURLConnection.HTTP_SEE_OTHER) {
+
+            String newUrl = conn.getHeaderField("Location");
+            log.info("[IMPORT] HuggingFace 302 跳转至真实地址: {}", newUrl);
+            return doDownload(newUrl, destFile); // 递归处理
+        }
+
+        if (status != 200) {
+            throw new IOException("下载失败，HTTP 状态码: " + status);
+        }
+
+        long contentLength = conn.getContentLengthLong();
+        log.info("[IMPORT] 文件大小: {} MB", contentLength / 1024 / 1024);
+
+        try (
+            InputStream input = conn.getInputStream();
+            FileOutputStream output = new FileOutputStream(String.valueOf(destFile))
+        ) {
+
+            byte[] buffer = new byte[1024 * 1024]; // 1MB 缓冲
+            int bytesRead;
+            long totalRead = 0;
+
+            while ((bytesRead = input.read(buffer)) != -1) {
+                output.write(buffer, 0, bytesRead);
+                totalRead += bytesRead;
+
+                // 这里如果你需要更新下载进度，可以添加回调
+                // 但现在不需要，因为前端只关心上传进度
+            }
+
+            output.flush();
+        }
+
+        log.info("[IMPORT] 模型文件已下载到: {}", destFile.getAbsolutePath());
+
+        return destFile;
+    }
+
+
+    @Override
+    public String startImportAsync(ModelsDTO dto) {
+
+        // 生成 taskId
+        String taskId = "task-" + System.currentTimeMillis();
+
+        // 初始化任务状态
+        progressStore.start(taskId, "任务已开始，准备下载模型文件...");
+
+        // 异步执行任务
+        CompletableFuture.runAsync(() -> {
+
+            File tempLocalFile = null;
+
+            try {
+                // ==========================================================
+                // 1. 下载 HuggingFace 模型
+                // ==========================================================
+                progressStore.updatePercent(taskId, 5, "正在从 HuggingFace 下载模型...");
+
+
+                // ----------------------------------------------------------
+                // 【核心修改】自动构造完整的下载 URL
+                // ----------------------------------------------------------
+                String hubUrl = dto.getHubUrl();
+
+                if (hubUrl != null && !hubUrl.trim().isEmpty() && !hubUrl.toLowerCase().startsWith("http")) {
+                    // 假设约定：主模型文件在 main 分支下，文件名为 model.safetensors
+                    String fullDownloadUrl = "https://huggingface.co/" + hubUrl + "/resolve/main/model.safetensors";
+                    dto.setHubUrl(fullDownloadUrl); // 将修正后的 URL 设回 DTO
+                    log.info("[IMPORT] 自动构造下载 URL: {}", fullDownloadUrl);
+                }
+
+                tempLocalFile = downloadModelFromHub(dto.getHubUrl());
+                long fileSize = tempLocalFile.length();
+                progressStore.updatePercent(taskId, 30, "模型下载完成，准备上传至对象存储...");
+
+                // ==========================================================
+                // 2. 上传 COS（带进度）
+                // ==========================================================
+                String fileName = tempLocalFile.getName();
+                InputStream fileStream = new FileInputStream(tempLocalFile);
+
+                progressStore.updatePercent(taskId, 35, "开始上传模型文件至对象存储...");
+
+                String cosKey = cosUtils.uploadStreamWithProgress(
+                    fileStream,
+                    fileName,
+                    fileSize,
+                    percent -> {
+                        // 强制将结果转换为 int，解决潜在的 long -> int 赋值问题
+                        int mapped = 30 + (int) ((percent * 60.0) / 100.0);
+
+                        // 或者，如果您确定 percent 是 int，并且 percent * 60 不会溢出 int，可以使用：
+                        // int mapped = 30 + (percent * 60) / 100;
+
+                        progressStore.updatePercent(taskId, mapped, "正在上传模型文件...");
+                    }
+                );
+
+                String fileUrl = cosUtils.getPublicUrl(cosKey);
+                progressStore.updatePercent(taskId, 95, "上传完成，正在写入数据库...");
+
+
+                // ==========================================================
+                // 3. 写入数据库
+                // ==========================================================
+                Models model = new Models();
+                model.setName(dto.getName());
+                model.setDescription(dto.getDescription());
+                model.setHubUrl(dto.getHubUrl());
+                model.setFilePath(fileUrl);
+                model.setVersion(dto.getVersion());
+                model.setSize(fileSize);
+                model.setUserId(dto.getUserId());
+                model.setStatus("Active");
+                model.setCreatedTime(Timestamp.valueOf(LocalDateTime.now()));
+                model.setUpdatedTime(Timestamp.valueOf(LocalDateTime.now()));
+
+                dataMapper.insert(model);
+
+
+                // ==========================================================
+                // 4. 标记成功
+                // ==========================================================
+                progressStore.success(taskId, "模型导入成功！");
+
+            } catch (Exception e) {
+
+                log.error("[IMPORT] 模型导入失败: {}", e.getMessage(), e);
+                progressStore.fail(taskId, "导入失败：" + e.getMessage());
+
+            } finally {
+
+                if (tempLocalFile != null && tempLocalFile.exists()) {
+                    try { tempLocalFile.delete(); } catch (Exception ignored) {}
+                }
+            }
+
+        });
+
+        // 返回 taskId 给前端
+        return taskId;
+    }
+
+    @Override
+    public List<FileInfoDTO> getFileInfo(Integer id) {
+        if (id == null) {
+            return List.of(); // 返回空列表
+        }
+
+        // 1. 构造查询条件
+        // LambdaQueryWrapper 提供了类型安全的方式来引用字段 (ModelFiles::getModelId)
+        LambdaQueryWrapper<ModelFiles> wrapper = new LambdaQueryWrapper<>();
+
+        // 查询条件：model_id = id
+        // 注意：ModelFiles.modelId 是 Long 类型，这里将 Integer 类型的 id 转换为 Long
+        wrapper.eq(ModelFiles::getModelId, id.longValue());
+
+        // 2. 执行查询
+        // selectList 将返回满足条件的 ModelFiles 实体列表
+        List<ModelFiles> fileList = fileMapper.selectList(wrapper);
+
+        // 3. 结果转换 (将 ModelFiles 列表转换为 FileInfoDTO 列表)
+        if (fileList == null || fileList.isEmpty()) {
+            return List.of();
+        }
+
+        List<FileInfoDTO> dtoList = fileList.stream()
+            .map(file -> {
+                FileInfoDTO dto = new FileInfoDTO();
+                // 假设 FileInfoDTO 和 ModelFiles 字段结构相似，使用 BeanUtils 复制属性
+                BeanUtils.copyProperties(file, dto);
+                return dto;
+            })
+            .collect(Collectors.toList());
+
+        return dtoList;
+    }
+
+
+    /**
+     * 将指定 modelId 的状态标记为 Error，并写入错误信息（更新 updatedTime）
+     */
+    private void markModelError(Integer modelId, String errMsg) {
+        try {
+            Models m = new Models();
+            m.setId(modelId);
+            m.setStatus("Error");
+            m.setUpdatedTime(new Timestamp(System.currentTimeMillis()));
+            // 若你的 Models 表有字段存错误信息，可以设置，例如 m.setErrorMessage(errMsg);
+            dataMapper.updateById(m);
+        } catch (Exception e) {
+            log.error("标记模型 Error 状态失败，id={}", modelId, e);
+        }
+    }
+
+
+
 
     /**
      * 格式化文件大小
