@@ -191,7 +191,7 @@ public class ModelsController {
     /**
      * 用模型id获取对应文件信息
      */
-    @GetMapping("/{id}/file")
+    @GetMapping("/file/{id}")
     public R<List<FileInfoDTO>> getFileInfo(@PathVariable Integer id) {
         List<FileInfoDTO> fileInfo = modelsService.getFileInfo(id);
         if (fileInfo == null) {
