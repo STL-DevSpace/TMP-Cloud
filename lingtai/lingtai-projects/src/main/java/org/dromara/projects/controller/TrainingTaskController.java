@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.projects.domain.dto.ClusterInfoDTO;
 import org.dromara.projects.domain.dto.TrainingTaskDTO;
+import org.dromara.projects.domain.dto.TrainingTaskUpdateDTO;
 import org.dromara.projects.domain.vo.TrainingTaskVO;
 import org.dromara.projects.service.ITrainingTaskService;
 import org.springframework.validation.annotation.Validated;
@@ -97,7 +98,14 @@ public class TrainingTaskController {
         trainingTaskService.deleteTask(id);
         return R.ok();
     }
-
+    /**
+     * 更新训练任务
+     */
+    @PostMapping("/update/{id}")
+    public R<Boolean> update(@PathVariable Long id, @Validated @RequestBody TrainingTaskUpdateDTO dto) {
+        Boolean result = trainingTaskService.updateTask(id, dto);
+        return R.ok(result);
+    }
     /**
      * TODO 临时集群列表
      */

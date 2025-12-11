@@ -3,6 +3,7 @@ package org.dromara.projects.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.dromara.projects.domain.TrainingTask;
 import org.dromara.projects.domain.dto.TrainingTaskDTO;
+import org.dromara.projects.domain.dto.TrainingTaskUpdateDTO;
 import org.dromara.projects.domain.vo.TrainingTaskVO;
 import java.util.List;
 
@@ -50,4 +51,6 @@ public interface ITrainingTaskService {
      * 删除训练任务
      */
     Boolean deleteTask(Long id);
+
+    Boolean updateTask(Long id, TrainingTaskUpdateDTO dto);
 }

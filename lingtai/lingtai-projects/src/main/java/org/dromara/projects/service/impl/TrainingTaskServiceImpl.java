@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.projects.domain.TrainingTask;
 import org.dromara.projects.domain.dto.TrainingTaskDTO;
+import org.dromara.projects.domain.dto.TrainingTaskUpdateDTO;
 import org.dromara.projects.domain.vo.TrainingTaskVO;
 import org.dromara.projects.enums.TrainingTaskStatus;
 import org.dromara.projects.mapper.TrainingTaskMapper;
@@ -201,6 +202,17 @@ public class TrainingTaskServiceImpl implements ITrainingTaskService {
         }
 
         return baseMapper.deleteById(id) > 0;
+    }
+
+    @Override
+    public Boolean updateTask(Long id, TrainingTaskUpdateDTO dto) {
+        //根据前端传回来的有的数据进行更新
+        TrainingTask task = baseMapper.selectById(id);
+        if (task == null) {
+            throw new RuntimeException("训练任务不存在");
+        }
+        task.setName(dto.getName());
+        return baseMapper.updateById(task) > 0;
     }
 
     /**
