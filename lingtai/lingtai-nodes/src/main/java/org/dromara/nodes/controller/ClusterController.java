@@ -57,10 +57,6 @@ public class ClusterController {
         clustersService.delete(clusterId);
         return R.ok("删除成功");
     }
-    @PostMapping("/{id}/nodes/")
-    public R<Nodes> addNode(@PathVariable("id") Long clusterId, @RequestBody Nodes node) {
-        Nodes result = nodesService.addByClusterId(clusterId, node);
-        return R.ok(result);
-    }
-
 }
+
+

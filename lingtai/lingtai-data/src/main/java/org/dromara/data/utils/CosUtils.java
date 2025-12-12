@@ -45,6 +45,7 @@ public class CosUtils {
      * 智能上传：根据文件大小自动选择普通上传或分块上传
      */
     public String uploadFile(InputStream inputStream, String fileName, long contentLength) {
+
         if (contentLength > MULTIPART_UPLOAD_THRESHOLD) {
             log.info("文件大小 {} 字节，使用分块上传", contentLength);
             return uploadFileMultipart(inputStream, fileName, contentLength);

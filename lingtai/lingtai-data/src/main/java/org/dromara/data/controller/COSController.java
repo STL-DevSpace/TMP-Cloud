@@ -1,5 +1,6 @@
 package org.dromara.data.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.dubbo.config.annotation.DubboReference;
@@ -33,10 +34,13 @@ public class COSController {
      */
     @PostMapping("/upload")
     public R<Map<String, Object>> uploadFiles(@RequestParam("files[]") List<MultipartFile> files) {
+        //TODO cdn加速
         if (files == null || files.isEmpty()) {
             return R.fail("未接收到任何文件");
         }
-
+        String loginStr = StpUtil.getLoginId().toString();
+        String loginId = loginStr.substring(loginStr.indexOf(":")+1);
+        Long userId = Long.valueOf(loginId);
         log.info("文件上传（CosUtils），共接收到 {} 个文件", files.size());
 
         Map<String, Object> result = new HashMap<>();
@@ -45,7 +49,7 @@ public class COSController {
         // 【修正 1】引入一个变量来存储本次上传的唯一目录名
         String uniqueDir = UUID.randomUUID().toString();
         // 定义 COS 存储的根路径前缀，例如: "model/f9207432-dc2c-4065-8105-32c8bee21658"
-        String baseKeyPrefix = "model/" + uniqueDir;
+        String baseKeyPrefix = "model/" + userId + "/" + uniqueDir;
 
         // 用于存储最终返回的 Primary URL（整个文件夹的根 URL）
         String primaryFileUrl = null;
