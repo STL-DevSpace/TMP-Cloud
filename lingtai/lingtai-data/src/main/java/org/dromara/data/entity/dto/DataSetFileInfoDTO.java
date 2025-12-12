@@ -53,6 +53,10 @@ public class DataSetFileInfoDTO implements Serializable {
      * 文件上传时间
      */
     private Timestamp createdTime;
+    /**
+     * 文件类型
+     */
+    private String dataType;
 
     // 您可以根据需要添加更多字段，例如：
     // private String hashMd5; // 文件的MD5校验码

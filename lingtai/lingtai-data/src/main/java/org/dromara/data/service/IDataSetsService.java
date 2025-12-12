@@ -26,7 +26,7 @@ public interface IDataSetsService {
      * @param status 状态（可选）
      * @return 分页结果
      */
-    IPage<DataSetsDTO> pageDataSets(Integer pageNum, Integer pageSize, String name, String status);
+    IPage<DataSetsDTO> pageDataSets(Integer pageNum, Integer pageSize, String name, String status, String dataType);
 
     /**
      * 根据ID查询数据集

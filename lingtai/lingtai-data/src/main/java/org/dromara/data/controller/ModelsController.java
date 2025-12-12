@@ -107,11 +107,11 @@ public class ModelsController {
      * @return 更新结果
      */
     @PutMapping("/{id}")
-    public R<Void> updateModel(@PathVariable Integer id, @Validated @RequestBody ModelsDTO dto) {
+    public R<Boolean> updateModel(@PathVariable Integer id, @Validated @RequestBody ModelsDTO dto) {
         dto.setId(id);
         boolean success = modelsService.updateModel(dto);
         if (success) {
-            return R.ok("模型更新成功");
+            return R.ok(success);
         }
         return R.fail("模型更新失败或模型不存在");
     }

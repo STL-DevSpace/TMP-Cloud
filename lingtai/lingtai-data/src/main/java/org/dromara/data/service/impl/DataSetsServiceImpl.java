@@ -54,7 +54,7 @@ public class DataSetsServiceImpl implements IDataSetsService {
     }
 
     @Override
-    public IPage<DataSetsDTO> pageDataSets(Integer pageNum, Integer pageSize, String name, String status) {
+    public IPage<DataSetsDTO> pageDataSets(Integer pageNum, Integer pageSize, String name, String status, String dataType) {
         LambdaQueryWrapper<DataSets> wrapper = new LambdaQueryWrapper<>();
 
         if (name != null && !name.isEmpty()) {
@@ -62,6 +62,11 @@ public class DataSetsServiceImpl implements IDataSetsService {
         }
         if (status != null && !status.isEmpty()) {
             wrapper.eq(DataSets::getStatus, status);
+        }
+        // 【新增的筛选逻辑】
+        if (dataType != null && !dataType.isEmpty()) {
+            // 假设 DataSets::getDataType 对应数据库中的数据类型字段
+            wrapper.eq(DataSets::getDataType, dataType);
         }
         // 按照创建时间倒序
         wrapper.orderByDesc(DataSets::getCreatedTime);

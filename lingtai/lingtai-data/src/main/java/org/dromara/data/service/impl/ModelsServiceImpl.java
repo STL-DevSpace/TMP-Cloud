@@ -63,7 +63,10 @@ public class ModelsServiceImpl implements IModelsService {
     public IPage<ModelsDTO> getModelsPage(Integer pageNum, Integer pageSize, String name, String status) {
         Page<Models> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Models> queryWrapper = new LambdaQueryWrapper<>();
-
+        String loginStr = StpUtil.getLoginId().toString();
+        String loginId = loginStr.substring(loginStr.indexOf(":")+1);
+        Long userId = Long.valueOf(loginId);
+        queryWrapper.eq(Models::getUserId, userId);
         // 条件查询
         if (name != null && !name.trim().isEmpty()) {
             queryWrapper.like(Models::getName, name);

@@ -54,6 +54,10 @@ public class DataSetsFiles implements Serializable {
      * 是否是主文件 (1: 是, 0: 否)。用于快速识别模型的主要文件。
      */
     private Integer isPrimary;
+    /**
+     * 文件类型
+     */
+    private String dataType;
 
     /**
      * 文件上传时间

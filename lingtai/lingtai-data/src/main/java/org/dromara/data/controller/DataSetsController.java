@@ -53,9 +53,10 @@ public class DataSetsController {
         @RequestParam(defaultValue = "1") Integer pageNum,
         @RequestParam(defaultValue = "10") Integer pageSize,
         @RequestParam(required = false) String name,
-        @RequestParam(required = false) String status
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) String dataType
     ) {
-        IPage<DataSetsDTO> page = dataSetsService.pageDataSets(pageNum, pageSize, name, status);
+        IPage<DataSetsDTO> page = dataSetsService.pageDataSets(pageNum, pageSize, name, status, dataType);
         return R.ok(page);
     }
 
